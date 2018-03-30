@@ -7,10 +7,10 @@ import com.poiji.exception.PoijiExcelType;
 import com.poiji.exception.PoijiException;
 import com.poiji.option.PoijiOptions;
 import com.poiji.option.PoijiOptions.PoijiOptionsBuilder;
+import com.poiji.util.Cvs2Ex;
 import com.poiji.util.Files;
 
-import java.io.File;
-import java.io.InputStream;
+import java.io.*;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,25 +41,25 @@ public final class Poiji {
     /**
      * converts excel rows into a list of objects
      *
-     * @param file
-     *         excel file ending with .xls or .xlsx.
-     * @param type
-     *         type of the root object.
-     * @param <T>
-     *         type of the root object.
-     * @return
-     *         the newly created a list of objects
-     *
-     * @throws PoijiException
-     *          if an internal exception occurs during the mapping process.
-     * @throws InvalidExcelFileExtension
-     *          if the specified excel file extension is invalid.
-     * @throws IllegalCastException
-     *          if this Field object is enforcing Java language access control and the underlying field is either inaccessible or final.
-     *
+     * @param file excel file ending with .xls or .xlsx.
+     * @param type type of the root object.
+     * @param <T>  type of the root object.
+     * @return the newly created a list of objects
+     * @throws PoijiException            if an internal exception occurs during the mapping process.
+     * @throws InvalidExcelFileExtension if the specified excel file extension is invalid.
+     * @throws IllegalCastException      if this Field object is enforcing Java language access control and the underlying field is either inaccessible or final.
      * @see Poiji#fromExcel(File, Class, PoijiOptions)
      */
     public static synchronized <T> List<T> fromExcel(final File file, final Class<T> type) {
+
+        //--------------<<
+        Boolean cvs = Cvs2Ex.isCvs(file);
+        if (cvs) {
+            File file1Ex = Cvs2Ex.transfromToEx(file);
+            final Unmarshaller unmarshaller = deserializer(file1Ex, PoijiOptionsBuilder.settings().build());
+            return unmarshaller.unmarshal(type);
+        }
+        //--------------<<
         final Unmarshaller unmarshaller = deserializer(file, PoijiOptionsBuilder.settings().build());
         return unmarshaller.unmarshal(type);
     }
@@ -81,6 +81,14 @@ public final class Poiji {
                                                      PoijiExcelType excelType,
                                                      final Class<T> type) {
         Objects.requireNonNull(excelType);
+        //--------------------------------------------<<
+        if(excelType == PoijiExcelType.CSV) {
+
+            PoijiInputStream poijiInputStream = new PoijiInputStream<>(Cvs2Ex.transfromToEx(inputStream));
+            Unmarshaller unmarshaller = UnmarshallerHelper.HSSFInstance(poijiInputStream, PoijiOptionsBuilder.settings().build());
+            return unmarshaller.unmarshal(type);
+        }
+        //-------------------------------------------<<
 
         final Unmarshaller unmarshaller = deserializer(inputStream, excelType, PoijiOptionsBuilder.settings().build());
         return unmarshaller.unmarshal(type);
@@ -100,6 +108,14 @@ public final class Poiji {
      * @see Poiji#fromExcel(File, Class)
      */
     public static synchronized <T> List<T> fromExcel(final File file, final Class<T> type, final PoijiOptions options) {
+        //--------------<<
+        Boolean cvs = Cvs2Ex.isCvs(file);
+        if(cvs){
+            File file1Ex = Cvs2Ex.transfromToEx(file);
+            final Unmarshaller unmarshaller = deserializer(file1Ex, options);
+            return unmarshaller.unmarshal(type);
+        }
+        //------------<<
         final Unmarshaller unmarshaller = deserializer(file, options);
         return unmarshaller.unmarshal(type);
     }
@@ -124,6 +140,13 @@ public final class Poiji {
                                                      final PoijiOptions options) {
         Objects.requireNonNull(excelType);
 
+        if(excelType == PoijiExcelType.CSV) {
+
+            PoijiInputStream poijiInputStream = new PoijiInputStream<>(Cvs2Ex.transfromToEx(inputStream));
+            Unmarshaller unmarshaller = UnmarshallerHelper.HSSFInstance(poijiInputStream, options);
+            return unmarshaller.unmarshal(type);
+        }
+
         final Unmarshaller unmarshaller = deserializer(inputStream, excelType, options);
         return unmarshaller.unmarshal(type);
     }
@@ -138,7 +161,8 @@ public final class Poiji {
             return UnmarshallerHelper.HSSFInstance(poijiFile, options);
         } else if (XLSX_EXTENSION.equals(extension)) {
             return UnmarshallerHelper.XSSFInstance(poijiFile, options);
-        } else {
+        }
+        else {
             throw new InvalidExcelFileExtension("Invalid file extension (" + extension + "), excepted .xls or .xlsx");
         }
     }
@@ -155,4 +179,10 @@ public final class Poiji {
             throw new InvalidExcelFileExtension("Invalid file extension (" + excelType + "), excepted .xls or .xlsx");
         }
     }
+
+
+
+
+
+
 }
